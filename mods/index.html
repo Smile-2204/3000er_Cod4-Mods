@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3000er Server Mods liste</title>
+    <title>3000er CoD4 Server - FastDL & Mod Übersicht</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -13,7 +13,7 @@
             padding: 40px 20px;
         }
         .container {
-            max-width: 900px;
+            max-width: 950px;
             margin: 0 auto;
             background-color: #1e1e1e;
             padding: 30px;
@@ -22,7 +22,7 @@
         }
         h1 {
             text-align: center;
-            color: #4CAF50; /* Schönes Gaming-Grün */
+            color: #4CAF50;
             margin-bottom: 5px;
         }
         p.description {
@@ -38,6 +38,7 @@
             padding: 15px;
             text-align: left;
             border-bottom: 1px solid #333;
+            vertical-align: middle;
         }
         th {
             background-color: #2a2a2a;
@@ -47,14 +48,35 @@
         tr:hover {
             background-color: #252525;
         }
-        a {
+        code {
+            background-color: #000;
+            padding: 4px 8px;
+            border-radius: 4px;
             color: #64b5f6;
-            text-decoration: none;
-            font-weight: bold;
+            font-family: monospace;
         }
-        a:hover {
-            text-decoration: underline;
-            color: #90caf9;
+        .btn-link {
+            background-color: #0288d1;
+            color: #fff;
+            padding: 8px 16px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .btn-link:hover {
+            background-color: #0277bd;
+        }
+        #loading {
+            text-align: center;
+            padding: 20px;
+            color: #888;
+        }
+        .unknown {
+            color: #666;
+            font-style: italic;
         }
     </style>
 </head>
@@ -62,31 +84,100 @@
 
     <div class="container">
         <h1>CoD4 FastDL Repository</h1>
-        <p class="description">Offizieller Fast-Download Mirror für unsere Server Mods und Custom Maps.</p>
+        <p class="description">Übersicht unserer Server Mods und Custom Maps.</p>
 
         <table>
             <thead>
                 <tr>
-                    <th>Mod / Map Name</th>
+                    <th>Mod / Map</th>
                     <th>Autor</th>
-                    <th>Direktlink (FastDL Pfad)</th>
+                    <th>FastDL Pfad</th>
+                    <th>Quelle</th>
                 </tr>
             </thead>
-            <tbody>
-                
-                <tr>
-                    <td><strong>Pezbot ModernPaintball 2016</strong></td>
-                    <td>SUPERLOPEZ</td>
-                    <td><a href="mods/superlopez_modernpaintball/mod.ff">mods/superlopez_modernpaintball/mod.ff</a></td>
-                </tr>
-                <tr>
-                    <td><strong>mp_crashtest (Custom Map)</strong></td>
-                    <td>MapMaker99</td>
-                    <td><a href="usermaps/mp_crashtest/mp_crashtest.ff">usermaps/mp_crashtest/...</a></td>
-                </tr>
+            <tbody id="mod-table-body">
                 </tbody>
         </table>
+        <div id="loading">Lade Daten von GitHub...</div>
     </div>
 
+    <script>
+        // ==========================================
+        // HIER DEINE GITHUB DATEN EINTRAGEN!
+        // ==========================================
+        const githubUser = 'Smile-2204'; 
+        const githubRepo = '3000er_Cod4-Mods';
+        // ==========================================
+
+        async function fetchFolders(path, typeName) {
+            const url = `https://api.github.com/repos/${githubUser}/${githubRepo}/contents/${path}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) return []; 
+                const data = await response.json();
+                
+                return data.filter(item => item.type === 'dir').map(dir => {
+                    return {
+                        name: dir.name,
+                        type: typeName,
+                        path: `${path}/${dir.name}/`,
+                        githubLink: dir.html_url
+                    };
+                });
+            } catch (error) {
+                console.error(`Fehler beim Laden von ${path}:`, error);
+                return [];
+            }
+        }
+
+        async function buildTable() {
+            const mods = await fetchFolders('mods', 'Mod');
+            const maps = await fetchFolders('usermaps', 'Map');
+            const allItems = [...mods, ...maps];
+
+            const tbody = document.getElementById('mod-table-body');
+            const loading = document.getElementById('loading');
+
+            if (allItems.length === 0) {
+                loading.innerText = 'Keine Mods/Maps gefunden. (User/Repo-Namen prüfen!)';
+                return;
+            }
+
+            loading.style.display = 'none';
+
+            // Gehe jeden gefundenen Ordner durch
+            for (const item of allItems) {
+                let author = '<span class="unknown">Unbekannt</span>';
+                let sourceLink = item.githubLink; // Fallback: GitHub Ordner
+                let linkText = 'GitHub Ordner';
+
+                // Versuche die about.json Datei im jeweiligen Ordner zu laden
+                try {
+                    const metaResponse = await fetch(`${item.path}about.json`);
+                    if (metaResponse.ok) {
+                        const meta = await metaResponse.json();
+                        if (meta.author) author = meta.author;
+                        if (meta.link) {
+                            sourceLink = meta.link;
+                            linkText = 'Zur Mod-Seite';
+                        }
+                    }
+                } catch (e) {
+                    // Falls keine Datei da ist, einfach ignorieren und Fallbacks nutzen
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${item.name}</strong><br><small style="color:#888">${item.type}</small></td>
+                    <td>${author}</td>
+                    <td><code>${item.path}</code></td>
+                    <td><a href="${sourceLink}" class="btn-link" target="_blank">${linkText}</a></td>
+                `;
+                tbody.appendChild(tr);
+            }
+        }
+
+        buildTable();
+    </script>
 </body>
 </html>
